@@ -22,9 +22,12 @@ def get_installed_applications():
     for source in sources:
         for app in os.listdir(source):
             if app.endswith(".app"):
-                applications.append(Application(app, os.path.join(source, app)))
+                applications.append(
+                    Application(app.removesuffix(".app"), os.path.join(source, app))
+                )
+
     return sorted(applications, key=lambda x: x.name)
 
 
 if __name__ == "__main__":
-    print(get_installed_applications())
+    print(*get_installed_applications(), sep="\n")

@@ -1,6 +1,7 @@
 # sample pyside winow hellow world
 
 from enum import Enum, auto
+import os
 import sys
 from typing import List
 from PySide6.QtWidgets import QApplication, QMainWindow
@@ -9,11 +10,29 @@ from PySide6.QtCore import Signal, Qt, QEvent
 import threading
 from pynput import keyboard
 from components.lists import ListFilterView, ListItem, ListItemType
-from lib import get_installed_applications
+from lib import get_installed_applications, Application
 
 
 class HotkeyAction(Enum):
     TOGGLE_WINDOW = auto()
+
+
+def get_application_action(application: Application):
+    def action():
+        os.system(f"open {application.path}")
+
+    return action
+
+
+home_items = []
+for application in get_installed_applications():
+    home_items.append(
+        ListItem(
+            application.name,
+            ListItemType.APPLICATION,
+            get_application_action(application),
+        )
+    )
 
 
 class MainWindow(QMainWindow):
@@ -41,7 +60,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.container)
 
         # Add initial view
-        self.push_view(ListFilterView())
+        self.push_view(ListFilterView(home_items))
 
         # Connect input changes to view update (React-like state/props)
         self.input_bar.textChanged.connect(self.on_input_changed)
@@ -143,6 +162,7 @@ class MainWindow(QMainWindow):
 
     def event(self, event):
         if event.type() == QEvent.WindowDeactivate:
+            self.input_bar.selectAll()
             self.hide()
         return super().event(event)
 

@@ -1,1 +1,1 @@
-from .get_installed_applications import get_installed_applications
+from .get_installed_applications import get_installed_applications, Application

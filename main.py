@@ -3,9 +3,9 @@
 from enum import Enum, auto
 import os
 import sys
-from typing import List
+from typing import List, Callable
 from PySide6.QtWidgets import QApplication, QMainWindow
-from PySide6.QtWidgets import QLineEdit, QVBoxLayout, QWidget, QListWidget
+from PySide6.QtWidgets import QLineEdit, QVBoxLayout, QWidget, QListWidget, QLabel
 from PySide6.QtCore import Signal, Qt, QEvent
 import threading
 from pynput import keyboard
@@ -17,22 +17,11 @@ class HotkeyAction(Enum):
     TOGGLE_WINDOW = auto()
 
 
-def get_application_action(application: Application):
-    def action():
-        os.system(f"open {application.path}")
-
-    return action
-
-
-home_items = []
-for application in get_installed_applications():
-    home_items.append(
-        ListItem(
-            application.name,
-            ListItemType.APPLICATION,
-            get_application_action(application),
-        )
-    )
+class SampleSubWidget(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setLayout(QVBoxLayout())
+        self.layout().addWidget(QLabel("Sample Sub Widget"))
 
 
 class MainWindow(QMainWindow):
@@ -60,7 +49,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.container)
 
         # Add initial view
-        self.push_view(ListFilterView(home_items))
+        self.setup_home_view()
 
         # Connect input changes to view update (React-like state/props)
         self.input_bar.textChanged.connect(self.on_input_changed)
@@ -76,6 +65,45 @@ class MainWindow(QMainWindow):
         self.hotkey_pressed.connect(self.on_hotkey)
         # Start the global hotkey listener in a separate thread
         threading.Thread(target=self.start_hotkey_listener, daemon=True).start()
+
+    def _get_application_action(self, application: Application):
+        def action():
+            os.system(f"open {application.path}")
+
+        return action
+
+    def _get_command_action(self, fn: Callable):
+        def action():
+            print("COMMAND ACTION")
+            fn()
+            print("Clearing input bar")
+            self.input_bar.clear()
+
+        return action
+
+    def setup_home_view(self):
+        home_items = []
+        for application in get_installed_applications():
+            home_items.append(
+                ListItem(
+                    application.name,
+                    ListItemType.APPLICATION,
+                    self._get_application_action(application),
+                )
+            )
+
+        home_items.append(
+            ListItem(
+                "11 Sample Sub Widget",
+                ListItemType.COMMAND,
+                self._get_command_action(lambda: self.push_view(SampleSubWidget())),
+            )
+        )
+
+        home_items.sort(key=str)
+
+        home_view = ListFilterView(home_items)
+        self.push_view(home_view)
 
     def push_view(self, view: QWidget):
         if self.current_view is not None:
@@ -94,6 +122,9 @@ class MainWindow(QMainWindow):
             self.layout.addWidget(self.current_view)
 
     def toggle_window(self):
+        # just propgate
+        self.on_input_changed(self.input_bar.text())
+        # handle visibility
         if self.isVisible():
             self.hide()
         else:
@@ -135,10 +166,12 @@ class MainWindow(QMainWindow):
         if obj == self.input_bar and event.type() == QEvent.KeyPress:
             key = event.key()
             text = event.text()
-            # Handle Escape: clear or toggle
+            # Handle Escape: clear, pop view, or toggle window
             if key == Qt.Key_Escape:
                 if self.input_bar.text():
                     self.input_bar.clear()
+                elif len(self.view_stack) > 1:
+                    self.pop_view()
                 else:
                     self.toggle_window()
                 return True

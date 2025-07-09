@@ -9,6 +9,7 @@ from PySide6.QtCore import Signal, Qt, QEvent
 import threading
 from pynput import keyboard
 from components.lists import ListFilterView, ListItem, ListItemType
+from lib import get_installed_applications
 
 
 class HotkeyAction(Enum):

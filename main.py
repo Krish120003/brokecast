@@ -5,12 +5,21 @@ import os
 import sys
 from typing import List, Callable
 from PySide6.QtWidgets import QApplication, QMainWindow
-from PySide6.QtWidgets import QLineEdit, QVBoxLayout, QWidget, QListWidget, QLabel
-from PySide6.QtCore import Signal, Qt, QEvent
+from PySide6.QtWidgets import (
+    QLineEdit,
+    QVBoxLayout,
+    QWidget,
+    QListWidget,
+    QLabel,
+    QListWidgetItem,
+)
+from PySide6.QtCore import Signal, Slot, Qt, QEvent
 import threading
 from pynput import keyboard
 from components.lists import ListFilterView, ListItem, ListItemType
 from lib import get_installed_applications, Application
+import pyperclip
+import time
 
 
 class HotkeyAction(Enum):
@@ -22,6 +31,64 @@ class SampleSubWidget(QWidget):
         super().__init__()
         self.setLayout(QVBoxLayout())
         self.layout().addWidget(QLabel("Sample Sub Widget"))
+
+
+class ClipboardWidget(QWidget):
+    clipboard_entry_signal = Signal(str)
+    clipboard_history = []  # class variable, shared across all instances
+
+    def __init__(self):
+        print("ClipboardWidget created")
+        super().__init__()
+        self.setLayout(QVBoxLayout())
+        self.layout().addWidget(QLabel("Clipboard"))
+
+        self.list_widget = QListWidget()
+        self.layout().addWidget(self.list_widget)
+
+        # Add padding and spacing between items via stylesheet
+        self.list_widget.setStyleSheet(
+            """
+            QListWidget::item {
+                background: red;
+                margin: 8px;
+                padding: 12px;
+                border-radius: 6px;
+                color: white;
+            }
+            QListWidget {
+                background: transparent;
+                border: none;
+            }
+            """
+        )
+
+        self.clipboard_entry_signal.connect(self.add_clipboard_entry)
+
+        # in the background, listen for all clipboard changes and store them
+        threading.Thread(target=self.start_clipboard_listener, daemon=True).start()
+
+    @Slot(str)
+    def add_clipboard_entry(self, entry):
+        ClipboardWidget.clipboard_history.append(entry)
+        self.list_widget.addItem(entry)
+        print("Clipboard has", len(ClipboardWidget.clipboard_history), "items")
+
+    def start_clipboard_listener(self):
+        last_clipboard = None
+        while True:
+            clipboard = pyperclip.paste()
+            if clipboard and clipboard != last_clipboard:
+                self.clipboard_entry_signal.emit(clipboard)
+                last_clipboard = clipboard
+            time.sleep(0.1)
+
+    # on show, rerender the entire list
+    def showEvent(self, event):
+        self.list_widget.clear()
+        for item in ClipboardWidget.clipboard_history:
+            self.list_widget.addItem(item)
+        super().showEvent(event)
 
 
 class MainWindow(QMainWindow):
@@ -97,6 +164,14 @@ class MainWindow(QMainWindow):
                 "11 Sample Sub Widget",
                 ListItemType.COMMAND,
                 self._get_command_action(lambda: self.push_view(SampleSubWidget())),
+            )
+        )
+
+        home_items.append(
+            ListItem(
+                "Clipboard History",
+                ListItemType.COMMAND,
+                self._get_command_action(lambda: self.push_view(ClipboardWidget())),
             )
         )
 

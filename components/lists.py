@@ -2,6 +2,7 @@ from enum import Enum, auto
 from PySide6.QtWidgets import QWidget, QListWidget, QVBoxLayout
 from PySide6.QtCore import Signal
 from typing import List
+from PySide6.QtCore import Qt
 
 
 class ListItemType(Enum):
